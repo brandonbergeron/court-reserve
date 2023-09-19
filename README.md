@@ -8,6 +8,7 @@ A Python script that automatically makes tennis court reservations on Court Rese
 - [Pip][1] (comes with the standard install of python)
 - [Chromedriver][2]
 
+More details about how to install chromedriver properly can be found in Step 2 of [THIS][4] medium article.
 
 First, download the script:
 ```shell
@@ -63,3 +64,4 @@ The script is scheduled to quit 2 minutes after submitting the requests. You can
 [1]: https://pip.pypa.io/en/stable/installation/
 [2]: https://chromedriver.chromium.org/downloads
 [3]: https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/
+[4]: https://medium.com/@patrick.yoho11/installing-selenium-and-chromedriver-on-windows-e02202ac2b08
