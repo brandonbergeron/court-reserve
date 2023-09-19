@@ -3,23 +3,14 @@ from datetime import datetime
 import schedule
 import questionary
 from utils.maps import courtMap, weekdayTimeMap, saturdayTimeMap, sundayTimeMap, days, months, dates
-from utils.creds import userName, password
-from utils.paths import loginPage, reservationUrl, closeXPath, submitXPath, resTypeXPath
+from utils.creds import loginPage, reservationUrl, userName, password
+from utils.paths import closeXPath, submitXPath, resTypeXPath
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-
-mmDD = str(datetime.now().date())[-5:]
-yyyy = str(datetime.now().date())[:4]
-
-newYear = ['12-25', '12-26', '12-27', '12-28', '12-29', '12-30', '12-31']
-targetYear = yyyy
-
-if str(datetime.now().date())[-5:] in newYear: # TODO check this
-    targetYear = str(int(yyyy) + 1)
 
 test = input('Are you running in test mode? (y/n): ').lower().strip() == 'y'
 numDrivers = int(questionary.text('How many browsers to boot up?').ask())
@@ -29,12 +20,12 @@ day = questionary.select(
 ).ask()
 targetMonth = questionary.select(
      "Month:",
-     choices = months).ask()
+     choices = months.values()).ask()
 targetDate = questionary.select(
      "Date:",
      choices = dates,
      default = str(datetime.now().day)
-)
+).ask()
 resType = questionary.select(
     "Select reservation type:",
     choices = [
@@ -80,55 +71,51 @@ def loginDriver(driver: webdriver):
     return driver
 
 
+# Check for if desired date is not in current month
 def calCheck(driver: webdriver):
-    nextButtonClassName = "k-nav-next"
-    monthYearClassName = "k-nav-fast"
-
-    datePicker = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, ".k-icon.k-i-calendar")))
+    datePicker = driver.find_element(By.CSS_SELECTOR, ".k-icon.k-i-calendar")
     datePicker.click()
+    time.sleep(2)
 
-    selectedYear = driver.find_element(By.CLASS_NAME, monthYearClassName)
-    selectedMonthYearString = selectedYear.get_attribute("innerHTML")
-    targetMonthYearString = targetMonth + ' ' + targetYear
-    print(selectedMonthYearString)
+    currentMonth = str(datetime.now().date())[-5:-3]
 
-    while (selectedMonthYearString != targetMonthYearString):
-            next_click = driver.find_element(By.CLASS_NAME, nextButtonClassName)
-            next_click.click()
-            time.sleep(2)
+    if (targetMonth != months[currentMonth[:2]]):
+        nextButton = driver.find_element(By.CSS_SELECTOR, "[data-action='next']")
+        nextButton.click()
+        time.sleep(2)
 
-            selectedYear = driver.find_element(By.CLASS_NAME, monthYearClassName)
-            selectedMonthYearString = selectedYear.get_attribute("innerHTML")
-            # print(selected_month_year_string)
+    return driver
 
 
+# Find date in calendar popup
 def selectDate(driver: webdriver):
-    calTable = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "k-content")))
+    calTable = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CLASS_NAME, "k-content")))
 
     for row in calTable.find_elements(By.XPATH, "//tr"):
                 for cell in row.find_elements(By.XPATH, "td"):
                     if (cell.text == targetDate):
-                        driver.find_element(By.LINK_TEXT, targetDate).click()
-                        time.sleep(4)
-                        return driver
+                        dateElem = driver.find_element(By.LINK_TEXT, targetDate)
+                        dateElem.click()
+                        time.sleep(3)
+    return driver
                     
 timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[day][targetTime]}]/td[{courtMap[targetCourt]}]/span/button"
 
 def selectReservation(driver: webdriver):
-    reservationSlot = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, timeSlotXPath)))
+    reservationSlot = driver.find_element(By.XPATH, timeSlotXPath)
     reservationSlot.click()
     time.sleep(2)
 
     return driver
 
 def editReservation(driver: webdriver):
-     # TODO this is hardcoded for Singles reservations but should be input driven
+    # Singles, Doubles, or Ball Machine:
     reservationTypeSelector = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, resTypeXPath)))
     reservationTypeSelector.click()
     reservationTypeSelector.send_keys(resType[0])
     reservationTypeSelector.send_keys(Keys.ENTER)
 
-    # TODO add ability to select duration/add guests? 
+    # TODO Duration 
 
     return driver
 
@@ -138,24 +125,15 @@ def locateSubmitButtons(drivers: dict):
             driver['button'] = driver['driver'].find_element(By.XPATH, closeXPath)
         else:
             driver['button'] = driver['driver'].find_element(By.XPATH, submitXPath)
-        
-    return drivers
+    if test:   
+        return drivers
 
 def prepareDrivers(drivers: dict):
     for driverName, driver in drivers.items():
-        driver['driver'] = loginDriver(driver['driver'])
-        driver['driver'] = calCheck(driver['driver'])
-        driver['driver'] = selectDate(driver['driver'])
-        driver['driver'] = selectReservation(driver['driver'])
-        driver['driver'] = editReservation(driver['driver'])
-        # driver = locateSubmitButton(driver)
-        # driver = selectReservation(selectDate(initDriver(driver)))  This is cool but reservation type gets fucked up
+        driver['driver'] = editReservation(selectReservation(selectDate(calCheck(loginDriver(driver['driver'])))))
     drivers = locateSubmitButtons(drivers)
-
-    return drivers
-
-# some_dict_view = some_dict.items()
-# some_list = list(some_dict_view)
+    if test:
+        return drivers
 
 def fire(drivers: dict):
     driverView = drivers.items()
@@ -163,11 +141,9 @@ def fire(drivers: dict):
     # print(str(datetime.now()))
     for driver in driverList:
         driver[1]['button'].click()
-    # for driverName, driver in drivers.items():
-    #     driver['button'].click()
-    #     #   time.sleep(.05)
-    print(str(datetime.now()))
-    # return drivers
+    print('Done submitting at: ' + str(datetime.now()))
+    if test:
+        return drivers
 
 def closeAllDrivers(drivers: dict):
     for driverName, driver in drivers.items():
@@ -175,9 +151,9 @@ def closeAllDrivers(drivers: dict):
 
 
 
-# schedule.every().day.at("09:24:00", "US/Central").do(createDriverDict, numDrivers)
-# schedule.every().day.at("09:25:30", "US/Central").do(prepareDrivers, driverContainer)
-# schedule.every().day.at("09:34:58", "US/Central").do(fire, driverContainer)
+schedule.every().day.at("07:45:00", "US/Central").do(createDriverDict, numDrivers)
+schedule.every().day.at("07:45:45", "US/Central").do(prepareDrivers, driverContainer)
+schedule.every().day.at("07:58:00", "US/Central").do(fire, driverContainer)
 
 while True:
     if test:
@@ -186,6 +162,7 @@ while True:
         time.sleep(10)
         print(str(datetime.now()))
         fire(driverDict)
+        time.sleep(10)
         quit()
     else: 
         schedule.run_pending()

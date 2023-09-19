@@ -5,6 +5,5 @@ single-driver.py
 .vscode
 backup.py
 creds.py
-paths.py
 monolith.py
 __pycache__
