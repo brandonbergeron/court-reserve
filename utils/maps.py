@@ -1,3 +1,6 @@
+from selenium.webdriver.common.keys import Keys
+
+
 courtMap = {
     "Indoor 1": 1,
     "Indoor 2": 2,
@@ -125,6 +128,13 @@ sundayTimeMap = {
     "9:00 PM": 27,
     "9:30 PM": 28,
     "10:00 PM": 29,
+}
+
+durationMap = {
+    '30 minutes': [Keys.ARROW_UP, Keys.ARROW_UP],
+    '1 hour': Keys.ARROW_UP,
+    '1 hour 30 minutes': '',
+    '2 hours': Keys.ARROW_DOWN,
 }
 
 days = {
