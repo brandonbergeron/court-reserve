@@ -4,7 +4,7 @@ import schedule
 import questionary
 import threading
 from utils.maps import courtMap, durationMap, days, months
-from utils.localcreds import loginPage, reservationUrl, userName, password
+from utils.creds import loginPage, reservationUrl, userName, password
 from utils.paths import closeXPath, submitXPath, resTypeXPath, resDurationXPath
 from selenium import webdriver
 from selenium.webdriver.common.by import By
