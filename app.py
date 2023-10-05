@@ -39,7 +39,7 @@ if not submit:
     numDrivers = int(questionary.text("How many browsers to boot up?").ask())
 else:
     numDrivers = 20
-targetCourt = questionary.select("Select a court:", choices=courtMap.keys()).ask()
+# targetCourt = questionary.select("Select a court:", choices=courtMap.keys()).ask()
 targetTime = questionary.select("Select a time: ", choices=days[targetDay].keys()).ask()
 resType = "Singles"
 resDuration = questionary.select("Duration: ", choices=durationMap.keys()).ask()
