@@ -1,38 +1,44 @@
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import schedule
 import questionary
 import threading
-from utils.maps import courtMap, durationMap, days, months, dates
-from utils.creds import loginPage, reservationUrl, userName, password
+from utils.maps import courtMap, durationMap, days, months
+from utils.localcreds import loginPage, reservationUrl, userName, password
 from utils.paths import closeXPath, submitXPath, resTypeXPath, resDurationXPath
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
 
+def getTargetDate():
+    now = datetime.now()
+    
+    # If current time is before 8am, today is the first day. Otherwise, tomorrow is the first day.
+    if now.time() < datetime.now().replace(hour=8, minute=0, second=0, microsecond=0).time():
+        startDay = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    else:
+        startDay = now + timedelta(days=1)
+        startDay = startDay.replace(hour=8, minute=0, second=0, microsecond=0)
+    
+    # Adding 6 days to the first 8am will give the seventh 8am
+    resTarget = startDay + timedelta(days=7)
+    
+    dayOfWeek = resTarget.strftime('%A')
+    month = resTarget.strftime('%B')
+    targetDate = str(resTarget.day)
 
-test = input("Are you running in test mode? (y/n): ").lower().strip() == "y"
+    return dayOfWeek, month, targetDate
+
+targetDay, targetMonth, targetDate = getTargetDate()
+
+submit = input("Would you like to make a scheduled reservation? (y/n): ").lower().strip() == "y"
 numDrivers = int(questionary.text("How many browsers to boot up?").ask())
-day = questionary.select(
-    "Day: ",
-    choices=days,
-).ask()
-targetMonth = questionary.select("Month:", choices=months.values()).ask()
-targetDate = questionary.select(
-    "Date:", choices=dates, default=str(datetime.now().day)
-).ask()
-resType = questionary.select(
-    "Select reservation type:",
-    choices=[
-        "Singles",
-        "Doubles",
-        "Ball Machine",
-    ],
-).ask()
 targetCourt = questionary.select("Select a court:", choices=courtMap.keys()).ask()
-targetTime = questionary.select("Select a time: ", choices=days[day].keys()).ask()
+targetTime = questionary.select("Select a time: ", choices=days[targetDay].keys()).ask()
+resType = "Singles"
 resDuration = questionary.select("Duration: ", choices=durationMap.keys()).ask()
 
 driverContainer = {}
@@ -95,10 +101,18 @@ def selectDate(driver: webdriver):
                 return driver
 
 
-timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[day][targetTime]}]/td[{courtMap[targetCourt]}]/span/button"
+# timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[{courtMap[targetCourt]}]/span/button"
 
 
-def selectReservation(driver: webdriver):
+def selectReservation(driver: webdriver, driverId):
+    if int(driverId[-1]) % 2 == 0:
+        timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[1]/span/button"
+    else:
+        timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[2]/span/button"
+
+
+
+
     reservationSlot = driver.find_element(By.XPATH, timeSlotXPath)
     reservationSlot.click()
 
@@ -127,25 +141,71 @@ def editReservation(driver: webdriver):
 
     return driver
 
-
 def locateSubmitButtons(drivers: dict):
-    for driver in drivers.values():
-        if test:
-            driver["button"] = driver["driver"].find_element(By.XPATH, closeXPath)
-        else:
-            driver["button"] = driver["driver"].find_element(By.XPATH, submitXPath)
-    if test:
+    for driverId in list(drivers.keys()):  # Iterate over a copy of the keys
+        try:
+            driverInstance = drivers[driverId]["driver"]
+
+            if not submit:
+                drivers[driverId]["button"] = driverInstance.find_element(By.XPATH, closeXPath)
+            else:
+                drivers[driverId]["button"] = driverInstance.find_element(By.XPATH, submitXPath)
+
+        except NoSuchElementException as e:
+            # Handle specific exceptions for missing elements
+            print(f"Error locating element for {driverId}: {e}")
+            driverInstance.quit()
+            del drivers[driverId]
+        except Exception as e:
+            # Handle other unexpected exceptions
+            print(f"Unexpected error with {driverId}: {e}")
+            driverInstance.quit()
+            del drivers[driverId]
+
+    if not submit:
         return drivers
 
+# def locateSubmitButtons(drivers: dict):
+#     for driver in drivers.values():
+#         if not submit:
+#             driver["button"] = driver["driver"].find_element(By.XPATH, closeXPath)
+#         else:
+#             driver["button"] = driver["driver"].find_element(By.XPATH, submitXPath)
+#     if not submit:
+#         return drivers
 
 def prepareDrivers(drivers: dict):
-    for driver in drivers.values():
-        driver["driver"] = editReservation(
-            selectReservation(selectDate(calCheck(loginDriver(driver["driver"]))))
-        )
+    for driverId in list(drivers.keys()):  # Iterate over a copy of the keys
+        try:
+            driverInstance = drivers[driverId]["driver"]
+
+            driverInstance = loginDriver(driverInstance)
+            driverInstance = calCheck(driverInstance)
+            driverInstance = selectDate(driverInstance)
+            driverInstance = selectReservation(driverInstance, driverId)
+            driverInstance = editReservation(driverInstance)
+
+            drivers[driverId]["driver"] = driverInstance
+
+        except Exception as e:
+            # If an exception occurs at any stage
+            print(f"Removing {driverId} due to error: {e}")
+            driverInstance.quit()
+            del drivers[driverId]
+    
     drivers = locateSubmitButtons(drivers)
-    if test:
+
+    if not submit:
         return drivers
+
+# def prepareDrivers(drivers: dict):
+#     for driver in drivers.values():
+#         driver["driver"] = editReservation(
+#             selectReservation(selectDate(calCheck(loginDriver(driver["driver"]))))
+#         )
+#     drivers = locateSubmitButtons(drivers)
+#     if not submit:
+#         return drivers
 
 
 def click_button(driver_and_button):
@@ -154,7 +214,6 @@ def click_button(driver_and_button):
 
 def fire(drivers: dict):
     threads = []
-    time.sleep(.5)
     for driver_and_button in drivers.values():
         thread = threading.Thread(target=click_button, args=(driver_and_button,))
         thread.start()
@@ -164,7 +223,7 @@ def fire(drivers: dict):
         thread.join()
 
     print("Done submitting at: " + str(datetime.now()))
-    if test:
+    if not submit:
         return drivers
 
 
@@ -181,7 +240,7 @@ schedule.every().day.at("09:30:00", "US/Eastern").do(closeAllDrivers, driverCont
 
 
 while True:
-    if test:
+    if not submit:
         driverDict = createDriverDict(numDrivers)
         driverDict = prepareDrivers(driverDict)
         time.sleep(10)
