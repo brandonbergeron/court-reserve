@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 import schedule
 import questionary
 import threading
-from utils.maps import courtMap, durationMap, days, months
-from utils.creds import loginPage, reservationUrl, userName, password
+from utils.maps import durationMap, days, months
+from utils.localcreds import loginPage, reservationUrl, userName, password
 from utils.paths import closeXPath, submitXPath, resTypeXPath, resDurationXPath
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -16,14 +16,12 @@ from selenium.common.exceptions import NoSuchElementException
 def getTargetDate():
     now = datetime.now()
     
-    # If current time is before 8am, today is the first day. Otherwise, tomorrow is the first day.
     if now.time() < datetime.now().replace(hour=8, minute=0, second=0, microsecond=0).time():
         startDay = now.replace(hour=8, minute=0, second=0, microsecond=0)
     else:
         startDay = now + timedelta(days=1)
         startDay = startDay.replace(hour=8, minute=0, second=0, microsecond=0)
     
-    # Adding 6 days to the first 8am will give the seventh 8am
     resTarget = startDay + timedelta(days=7)
     
     dayOfWeek = resTarget.strftime('%A')
@@ -33,16 +31,18 @@ def getTargetDate():
     return dayOfWeek, month, targetDate
 
 targetDay, targetMonth, targetDate = getTargetDate()
-
 submit = input("Would you like to make a scheduled reservation? (y/n): ").lower().strip() == "y"
+
 if not submit:
     numDrivers = int(questionary.text("How many browsers to boot up?").ask())
 else:
     numDrivers = 20
-# targetCourt = questionary.select("Select a court:", choices=courtMap.keys()).ask()
+
 targetTime = questionary.select("Select a time: ", choices=days[targetDay].keys()).ask()
 resType = "Singles"
 resDuration = questionary.select("Duration: ", choices=durationMap.keys()).ask()
+indoor1XPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[1]/span/button"
+indoor2XPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[2]/span/button"
 
 driverContainer = {}
 
@@ -102,19 +102,13 @@ def selectDate(driver: webdriver):
                 dateElem.click()
                 time.sleep(3)
                 return driver
-
-
-# timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[{courtMap[targetCourt]}]/span/button"
-
+            
 
 def selectReservation(driver: webdriver, driverId):
     if int(driverId[-1]) % 2 == 0:
-        timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[1]/span/button"
+        timeSlotXPath = indoor1XPath
     else:
-        timeSlotXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[2]/span/button"
-
-
-
+        timeSlotXPath = indoor2XPath
 
     reservationSlot = driver.find_element(By.XPATH, timeSlotXPath)
     reservationSlot.click()
@@ -168,15 +162,6 @@ def locateSubmitButtons(drivers: dict):
     if not submit:
         return drivers
 
-# def locateSubmitButtons(drivers: dict):
-#     for driver in drivers.values():
-#         if not submit:
-#             driver["button"] = driver["driver"].find_element(By.XPATH, closeXPath)
-#         else:
-#             driver["button"] = driver["driver"].find_element(By.XPATH, submitXPath)
-#     if not submit:
-#         return drivers
-
 def prepareDrivers(drivers: dict):
     for driverId in list(drivers.keys()):  # Iterate over a copy of the keys
         try:
@@ -201,15 +186,6 @@ def prepareDrivers(drivers: dict):
     if not submit:
         return drivers
 
-# def prepareDrivers(drivers: dict):
-#     for driver in drivers.values():
-#         driver["driver"] = editReservation(
-#             selectReservation(selectDate(calCheck(loginDriver(driver["driver"]))))
-#         )
-#     drivers = locateSubmitButtons(drivers)
-#     if not submit:
-#         return drivers
-
 
 def click_button(driver_and_button):
     driver_and_button["button"].click()
@@ -217,6 +193,8 @@ def click_button(driver_and_button):
 
 def fire(drivers: dict):
     threads = []
+    time.sleep(.8)
+
     for driver_and_button in drivers.values():
         thread = threading.Thread(target=click_button, args=(driver_and_button,))
         thread.start()
@@ -236,8 +214,8 @@ def closeAllDrivers(drivers: dict):
 
 
 schedule.every().day.at("08:40:00", "US/Eastern").do(createDriverDict, numDrivers)
-schedule.every().day.at("08:42:00", "US/Eastern").do(prepareDrivers, driverContainer)
-schedule.every().day.at("08:59:59", "US/Eastern").do(fire, driverContainer)
+schedule.every().day.at("08:41:30", "US/Eastern").do(prepareDrivers, driverContainer)
+schedule.every().day.at("08:58:58", "US/Eastern").do(fire, driverContainer)
 schedule.every().day.at("09:30:00", "US/Eastern").do(closeAllDrivers, driverContainer)
 
 
