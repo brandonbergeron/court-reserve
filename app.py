@@ -215,7 +215,7 @@ def closeAllDrivers(drivers: dict):
 
 schedule.every().day.at("08:40:00", "US/Eastern").do(createDriverDict, numDrivers)
 schedule.every().day.at("08:41:30", "US/Eastern").do(prepareDrivers, driverContainer)
-schedule.every().day.at("08:58:58", "US/Eastern").do(fire, driverContainer)
+schedule.every().day.at("08:59:58", "US/Eastern").do(fire, driverContainer)
 schedule.every().day.at("09:30:00", "US/Eastern").do(closeAllDrivers, driverContainer)
 
 
