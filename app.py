@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import schedule
 import questionary
 import threading
-from utils.maps import durationMap, days, months
+from utils.maps import courtMap, durationMap, days, months
 from utils.localcreds import loginPage, reservationUrl, userName, password
 from utils.paths import closeXPath, submitXPath, resTypeXPath, resDurationXPath
 from selenium import webdriver
@@ -38,11 +38,11 @@ if not submit:
 else:
     numDrivers = 20
 
+targetCourt = questionary.select("Select a court: ", choices=courtMap.keys()).ask()
 targetTime = questionary.select("Select a time: ", choices=days[targetDay].keys()).ask()
 resType = "Singles"
 resDuration = questionary.select("Duration: ", choices=durationMap.keys()).ask()
-indoor1XPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[1]/span/button"
-indoor2XPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[2]/span/button"
+courtXPath = f"/html/body/div[1]/div[2]/div/div[2]/div/div/div/div/div/div/div/div/div/table/tbody/tr[2]/td[2]/div/table/tbody/tr[{days[targetDay][targetTime]}]/td[{courtMap[targetCourt]}]/span/button"
 
 driverContainer = {}
 
@@ -105,12 +105,8 @@ def selectDate(driver: webdriver):
             
 
 def selectReservation(driver: webdriver, driverId):
-    if int(driverId[-1]) % 2 == 0:
-        timeSlotXPath = indoor1XPath
-    else:
-        timeSlotXPath = indoor1XPath
-
-    reservationSlot = driver.find_element(By.XPATH, timeSlotXPath)
+    
+    reservationSlot = driver.find_element(By.XPATH, courtXPath)
     reservationSlot.click()
 
     return driver
@@ -215,7 +211,7 @@ def closeAllDrivers(drivers: dict):
 
 schedule.every().day.at("08:40:00", "US/Eastern").do(createDriverDict, numDrivers)
 schedule.every().day.at("08:41:30", "US/Eastern").do(prepareDrivers, driverContainer)
-schedule.every().day.at("08:59:56", "US/Eastern").do(fire, driverContainer)
+schedule.every().day.at("08:59:55", "US/Eastern").do(fire, driverContainer)
 schedule.every().day.at("09:30:00", "US/Eastern").do(closeAllDrivers, driverContainer)
 
 
