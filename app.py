@@ -163,11 +163,25 @@ def prepareDrivers(drivers: dict):
         try:
             driverInstance = drivers[driverId]["driver"]
 
+            print(f"Logging in {driverId}...")
             driverInstance = loginDriver(driverInstance)
+            print(F"  ...done Logging in {driverId}")
+
+            print(f"Navigating calendar for {driverId}...")
             driverInstance = calCheck(driverInstance)
+            print(f"  ...done Navigating for {driverId}")
+
+            print(f"Selecting date for {driverId}...")
             driverInstance = selectDate(driverInstance)
+            print(f"  ...done Selecting date for {driverId}")
+
+            print(f"Selecting reservation for {driverId}...")
             driverInstance = selectReservation(driverInstance, driverId)
+            print(f"  ...done Selecting reservation for {driverId}")
+
+            print(f"Editing reservation for {driverId}")
             driverInstance = editReservation(driverInstance)
+            print(f"  ...done Editing reservation for {driverId}")
 
             drivers[driverId]["driver"] = driverInstance
 
